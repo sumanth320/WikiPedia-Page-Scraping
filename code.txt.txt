@@ -1,0 +1,78 @@
+# Importing Necessary libraries
+import re
+import urllib,requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen
+import sqlite3
+
+url = "https://en.wikipedia.org/wiki/September_10"
+ 
+# Parsing the html content using Beautiful Soup
+page = requests.get(url) 
+data = BeautifulSoup(page.content,'html.parser')
+# Getting list of all the <ul> tags from the html source code
+data1 = data.find_all("ul")
+
+# Creating a connetion to a Database
+sqliteConnection = sqlite3.connect('SQLite_Python.db')
+
+ 
+# Creating a table with the required columns
+sqlite_create_table_query = '''CREATE TABLE Wikidata (
+                                Date TEXT,
+                                Description TEXT,
+                                Type TEXT);'''
+# Initializing a cursor for Database connection
+cursor = sqliteConnection.cursor()
+# Executing the cursor to create the table
+cursor.execute(sqlite_create_table_query)
+# Executing the Commit function
+sqliteConnection.commit()
+print('Wikidata table has created....')
+
+
+for j in range(1,4):
+    lis = data1[j].find_all('li') 
+    for i in lis:
+# Splitting the text into dates and descriptions based on "-"
+        c,d = re.sub("<.*?>","",str(i)).split("–")
+        if j==1:
+            type1 = "Events"
+        elif j==2:
+            type1 = "Births"
+        else:
+            type1 = "Deaths"
+# Inserting our Split data into required columns
+        sqlite_insert_query = """INSERT INTO Wikidata
+                          (Date, Description, Type) 
+                           VALUES 
+                          (?,?,?);"""
+        data_tuple = (c,d,type1)
+        cursor.execute(sqlite_insert_query, data_tuple)
+
+    #Performing a commit on our insert operations
+        sqliteConnection.commit()
+
+# Queriying our table Database
+sqlite_print_query = """select * from  Wikidata"""
+cursor.execute(sqlite_print_query)
+rows = cursor.fetchall()
+
+for row in rows:
+    print(row)
+
+
+# Queriying data as per specific case
+def query_data(category='Births'):
+    sqlite_print_query = f"""select * from  Wikidata"""
+    cursor.execute(sqlite_print_query)
+    rows = cursor.fetchall()
+    rows = [row for row in rows if row[2]==category]
+    return rows
+
+
+# convert queried data into dataframe
+import pandas as pd
+birth_data = query_data(category='Births')
+df = pd.DataFrame(birth_data, columns=['Year', 'Description', 'Type'])
+df
